@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEON VOID — Arcade Space Shooter</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --cyan: #22e6ff;
+    --magenta: #ff2e88;
+    --amber: #ffc233;
+    --violet: #8b5cff;
+    --bg: #04040f;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); }
+  body {
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    color: #dfeaff; user-select: none; -webkit-user-select: none;
+  }
+  #app, #app canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* ---------- HUD ---------- */
+  #hud {
+    position: fixed; inset: 0; pointer-events: none;
+    font-weight: 700; letter-spacing: .12em; z-index: 5;
+    text-shadow: 0 0 12px rgba(34, 230, 255, .8);
+  }
+  #hud .row { position: absolute; display: flex; align-items: baseline; gap: 18px; }
+  #score-box { top: 18px; left: 22px; flex-direction: column; gap: 2px; }
+  #score-label { font-size: 12px; color: #7fd8ff; }
+  #score { font-size: 34px; color: #fff; line-height: 1; }
+  #combo { font-size: 15px; color: var(--amber); min-height: 20px; }
+  #wave-box { top: 18px; right: 22px; flex-direction: column; align-items: flex-end; gap: 2px; }
+  #wave-label { font-size: 12px; color: #7fd8ff; }
+  #wave { font-size: 34px; color: #fff; line-height: 1; }
+  #lives { font-size: 22px; color: var(--cyan); letter-spacing: .2em; }
+  #shield-box { top: 142px; left: 22px; flex-direction: column; gap: 4px; font-size: 12px; }
+  .pow { color: var(--amber); }
+  .pow.off { color: #33506b; }
+  #boss-wrap {
+    position: absolute; top: 84px; left: 50%; transform: translateX(-50%);
+    width: min(560px, 70vw); display: none; text-align: center;
+  }
+  #boss-name { font-size: 13px; color: var(--magenta); margin-bottom: 5px; letter-spacing: .3em; }
+  #boss-bar-outer { height: 10px; border: 1px solid var(--magenta); background: rgba(255, 46, 136, .12); }
+  #boss-bar { height: 100%; width: 100%; background: linear-gradient(90deg, var(--magenta), #ff7a3d); transition: width .15s; }
+  #banner {
+    position: absolute; top: 34%; left: 0; right: 0; text-align: center;
+    font-size: 44px; color: #fff; opacity: 0; letter-spacing: .25em;
+    text-shadow: 0 0 24px var(--cyan), 0 0 60px var(--cyan);
+    transition: opacity .25s;
+  }
+  #banner small { display: block; font-size: 16px; letter-spacing: .3em; color: #9fe8ff; margin-top: 10px; }
+  #hint {
+    position: absolute; bottom: 16px; left: 0; right: 0; text-align: center;
+    font-size: 12px; color: #5f7fa8; letter-spacing: .2em;
+  }
+  #mute-tag { position: absolute; bottom: 16px; right: 20px; font-size: 12px; color: #5f7fa8; }
+
+  /* ---------- Full-screen panels ---------- */
+  .panel {
+    position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background: radial-gradient(ellipse at 50% 40%, rgba(20, 8, 60, .55), rgba(2, 2, 12, .88));
+    cursor: pointer;
+  }
+  .hidden { display: none !important; }
+  .game-title {
+    font-size: min(96px, 13vw); font-weight: 900; letter-spacing: .18em; line-height: 1;
+    color: #fff;
+    text-shadow: 0 0 18px var(--cyan), 0 0 70px var(--cyan), 0 0 120px var(--violet);
+  }
+  .game-title .void { color: var(--magenta); text-shadow: 0 0 18px var(--magenta), 0 0 70px var(--magenta), 0 0 120px var(--violet); }
+  .tagline { margin-top: 14px; font-size: 17px; letter-spacing: .34em; color: #9fe8ff; }
+  .goal {
+    margin-top: 26px; max-width: 560px; font-size: 15px; line-height: 1.7;
+    color: #c9dcff; letter-spacing: .06em; font-weight: 400;
+  }
+  .goal b { color: var(--amber); }
+  .controls {
+    margin-top: 22px; font-size: 13px; letter-spacing: .14em; color: #7fa8d8; line-height: 2;
+  }
+  .controls kbd {
+    display: inline-block; min-width: 22px; padding: 2px 7px; margin: 0 2px;
+    border: 1px solid #3d6a94; border-bottom-width: 3px; border-radius: 5px;
+    background: #0a1830; color: #cfeaff; font-family: inherit; font-weight: 700;
+  }
+  .cta {
+    margin-top: 34px; font-size: 19px; font-weight: 800; letter-spacing: .3em; color: #fff;
+    animation: pulse 1.4s ease-in-out infinite;
+    text-shadow: 0 0 16px var(--cyan);
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+  .best { margin-top: 18px; font-size: 13px; letter-spacing: .22em; color: var(--amber); }
+  #end-title { font-size: min(72px, 11vw); font-weight: 900; letter-spacing: .16em; line-height: 1; }
+  #end-title.win { color: #7dffce; text-shadow: 0 0 18px #2effa8, 0 0 70px #2effa8; }
+  #end-title.lose { color: var(--magenta); text-shadow: 0 0 18px var(--magenta), 0 0 70px var(--magenta); }
+  #end-stats { margin-top: 22px; font-size: 17px; line-height: 2; letter-spacing: .12em; color: #c9dcff; }
+  #end-stats b { color: #fff; font-size: 22px; }
+  #pause-panel .game-title { font-size: min(64px, 10vw); }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.min.js" } }
+</script>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="hud" class="hidden">
+  <div class="row" id="score-box">
+    <span id="score-label">SCORE</span>
+    <span id="score">0</span>
+    <span id="combo"></span>
+  </div>
+  <div class="row" id="wave-box">
+    <span id="wave-label">WAVE</span>
+    <span id="wave">1 / 10</span>
+    <span id="lives">&#9650;&#9650;&#9650;</span>
+  </div>
+  <div class="row" id="shield-box">
+    <span id="pow-shield" class="pow off">SHIELD</span>
+    <span id="pow-rapid" class="pow off">RAPID FIRE</span>
+    <span id="pow-spread" class="pow off">SPREAD SHOT</span>
+  </div>
+  <div id="boss-wrap">
+    <div id="boss-name">VOIDLEVIATHAN</div>
+    <div id="boss-bar-outer"><div id="boss-bar"></div></div>
+  </div>
+  <div id="banner"></div>
+  <div id="hint">WASD / ARROWS MOVE &nbsp;·&nbsp; SPACE / CLICK FIRE &nbsp;·&nbsp; P PAUSE &nbsp;·&nbsp; M MUTE</div>
+  <div id="mute-tag"></div>
+</div>
+
+<div id="menu-panel" class="panel">
+  <div class="game-title">NEON<span class="void">VOID</span></div>
+  <div class="tagline">ARCADE SPACE SHOOTER</div>
+  <div class="goal">
+    The swarm is pouring through the rift. Pilot the last interceptor of the
+    Void Patrol, blast through <b>10 waves</b> of drones and destroy the
+    <b>VOIDLEVIATHAN</b> to win the sector. Chain kills to raise your combo,
+    grab power-ups, and don't let your 3 hulls burn.
+  </div>
+  <div class="controls">
+    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or <kbd>&#8592;</kbd><kbd>&#8593;</kbd><kbd>&#8595;</kbd><kbd>&#8594;</kbd> MOVE &nbsp;·&nbsp; MOUSE STEERS &nbsp;·&nbsp; <kbd>SPACE</kbd> / CLICK FIRE
+    <br><kbd>P</kbd> PAUSE &nbsp;·&nbsp; <kbd>M</kbd> MUTE &nbsp;·&nbsp; <kbd>R</kbd> RESTART
+  </div>
+  <div class="cta">CLICK OR PRESS ENTER TO LAUNCH</div>
+  <div class="best" id="menu-best"></div>
+</div>
+
+<div id="end-panel" class="panel hidden">
+  <div id="end-title" class="lose">GAME OVER</div>
+  <div id="end-stats"></div>
+  <div class="cta">PRESS R OR CLICK TO FLY AGAIN</div>
+</div>
+
+<div id="pause-panel" class="panel hidden">
+  <div class="game-title">PAUSED</div>
+  <div class="cta">PRESS P TO RESUME</div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
