@@ -17,12 +17,50 @@ export class Hud {
     this.bossBar = document.getElementById('boss-bar');
     this.muteTag = document.getElementById('mute-tag');
     this.menuBest = document.getElementById('menu-best');
+    this.comboBar = document.getElementById('combo-bar');
+    this.flashEl = document.getElementById('flash');
+    this.popupsEl = document.getElementById('popups');
     this.powEls = {
       shield: document.getElementById('pow-shield'),
       rapid: document.getElementById('pow-rapid'),
       spread: document.getElementById('pow-spread'),
     };
     this._bannerTimer = null;
+    this._popups = [];
+  }
+
+  /** A floating "+100" at a screen position (px). Pooled, fades as it rises. */
+  popup(x, y, text, big = false) {
+    let el = this._popups.find((p) => p.used === false);
+    if (!el) {
+      if (this._popups.length >= 12) return;
+      el = { node: document.createElement('div'), used: false };
+      el.node.className = 'popup';
+      this.popupsEl.appendChild(el.node);
+      this._popups.push(el);
+    }
+    el.used = true;
+    el.node.textContent = text;
+    el.node.classList.toggle('big', big);
+    el.node.style.left = `${x}px`;
+    el.node.style.top = `${y}px`;
+    // Restart the CSS float animation.
+    el.node.classList.remove('go');
+    void el.node.offsetWidth;
+    el.node.classList.add('go');
+    setTimeout(() => { el.used = false; el.node.classList.remove('go'); }, 900);
+  }
+
+  /** Fraction of combo time left (0..1); hides the bar when the combo ends. */
+  setComboTimer(frac) {
+    this.comboBar.style.width = `${Math.max(0, Math.min(1, frac)) * 100}%`;
+    this.comboBar.style.opacity = frac > 0 ? '1' : '0';
+  }
+
+  /** A red vignette flash when the ship is hit. */
+  flash() {
+    this.flashEl.classList.add('on');
+    setTimeout(() => this.flashEl.classList.remove('on'), 140);
   }
 
   showGame() { this.hudEl.classList.remove('hidden'); this.menuEl.classList.add('hidden'); this.endEl.classList.add('hidden'); }

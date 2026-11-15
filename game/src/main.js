@@ -12,6 +12,8 @@ import { Hud } from './hud.js';
 
 const TOTAL_WAVES = 10;
 const BOSS_WAVE = 10;
+// Surge waves (3, 6, 9): the rift dumps extra hostiles at a faster pace.
+const SURGE_WAVES = new Set([3, 6, 9]);
 
 const game = {
   state: 'menu', // menu | playing | paused | over
@@ -47,13 +49,16 @@ function saveBest() {
 }
 
 function waveComposition(n) {
-  // Drones scale up every wave; weavers join at 2, tanks at 4, boss at 10.
+  // Drones scale up every wave; weavers join at 2, darts at 3, tanks at 4, boss at 10.
   const queue = [];
-  const drones = 4 + n * 2;
-  const weavers = n >= 2 ? 1 + Math.floor(n * 0.8) : 0;
+  const surge = SURGE_WAVES.has(n);
+  const drones = 4 + n * 2 + (surge ? 4 : 0);
+  const weavers = n >= 2 ? 1 + Math.floor(n * 0.8) + (surge ? 2 : 0) : 0;
+  const darts = n >= 3 ? 1 + Math.floor((n - 1) * 0.7) + (surge ? 2 : 0) : 0;
   const tanks = n >= 4 ? Math.floor((n - 2) / 2) : 0;
   for (let i = 0; i < drones; i++) queue.push('drone');
   for (let i = 0; i < weavers; i++) queue.push('weaver');
+  for (let i = 0; i < darts; i++) queue.push('dart');
   for (let i = 0; i < tanks; i++) queue.push('tank');
   // Shuffle so the wave never feels like a queue.
   for (let i = queue.length - 1; i > 0; i--) {
@@ -73,8 +78,13 @@ function startWave(n) {
     sounds.waveStart();
   } else {
     game.spawnQueue = waveComposition(n);
-    hud.banner(`WAVE ${n}`, n === 1 ? 'DESTROY THE SWARM' : `${game.spawnQueue.length} HOSTILES INBOUND`, 2000);
-    sounds.waveStart();
+    const surge = SURGE_WAVES.has(n);
+    hud.banner(
+      surge ? `WAVE ${n} — SURGE` : `WAVE ${n}`,
+      surge ? 'THE RIFT IS POURING — HOLD THE LINE' : n === 1 ? 'DESTROY THE SWARM' : `${game.spawnQueue.length} HOSTILES INBOUND`,
+      2200,
+    );
+    if (surge) sounds.surge(); else sounds.waveStart();
   }
   game.spawnTimer = 0.8;
   game.waveActive = true;
@@ -94,6 +104,7 @@ function startGame() {
   particles.update(10); // flush any leftover sparks
   hud.showGame();
   hud.setScore(0, 0);
+  hud.setComboTimer(0);
   hud.setLives(ship.lives);
   hud.setPower('shield', false);
   hud.setPower('rapid', false);
@@ -111,12 +122,37 @@ function endGame(won) {
   hud.showEnd(won, game.score, game.wave, game.kills);
 }
 
-function addScore(base) {
+function addScore(base, x, z) {
   game.combo = Math.min(5, game.combo + 1);
   game.comboTimer = 4;
-  game.score += base * game.combo;
+  const gained = base * game.combo;
+  game.score += gained;
   game.kills += 1;
   hud.setScore(game.score, game.combo);
+  // A floating "+gained" where the kill happened: feedback on every action.
+  if (x !== undefined && z !== undefined) {
+    const p = world.toScreen(x, z);
+    if (!p.behind) hud.popup(p.x, p.y, `+${gained}`, game.combo >= 4);
+  }
+}
+
+/** A nova core detonates: every enemy on screen takes 2 damage, plus a
+ * shockwave ring, a shake and a banner. Kills score through addScore. */
+function novaBlast() {
+  sounds.nova();
+  particles.ring(ship.x, 0, ship.z, [0.6, 0.95, 1], 18, 0.7);
+  particles.burst(ship.x, 0, ship.z, [0.7, 0.95, 1], 50, 12, 0.8);
+  world.addShake(0.8);
+  hud.banner('NOVA BURST', 'THE SKY CLEARS', 1600);
+  const nowMs = performance.now();
+  const hadBoss = !!enemies.boss;
+  for (const e of [...enemies.list]) {
+    // Two damage ticks: drones and weavers die, tanks and the boss are hurt.
+    const died = enemies.damage(e, nowMs) || enemies.damage(e, nowMs);
+    if (died) addScore(e.score, e.x, e.z);
+  }
+  if (hadBoss && !enemies.boss) { hud.hideBoss(); endGame(true); return; }
+  if (enemies.boss) hud.setBoss(enemies.boss.hp, enemies.boss.maxHp);
 }
 
 function onEnemyShoot(e, mode) {
@@ -153,7 +189,7 @@ function collide(dt) {
         b.active = false; b.mesh.visible = false;
         particles.burst(b.x, 0, b.z, [0.4, 0.9, 1], 6, 5, 0.35);
         if (enemies.damage(e, nowMs)) {
-          addScore(e.score);
+          addScore(e.score, e.x, e.z);
           powerups.drop(e.x, e.z);
           world.addShake(e.kind === 'boss' ? 0.7 : 0.25);
           if (e.kind === 'boss') { hud.hideBoss(); endGame(true); return; }
@@ -177,6 +213,7 @@ function collide(dt) {
         } else if (res === 'hit' || res === 'dead') {
           particles.burst(ship.x, 0, ship.z, [1, 0.4, 0.3], 40, 11, 0.9);
           world.addShake(0.6);
+          hud.flash();
           game.combo = 0;
           hud.setScore(game.score, 0);
           hud.setLives(ship.lives);
@@ -195,6 +232,7 @@ function collide(dt) {
         const res = ship.takeHit(nowMs);
         particles.burst(ship.x, 0, ship.z, [1, 0.5, 0.2], 30, 10, 0.8);
         world.addShake(0.6);
+        hud.flash();
         game.combo = 0;
         hud.setScore(game.score, 0);
         hud.setLives(ship.lives);
@@ -210,26 +248,30 @@ function updatePlaying(dt) {
   // Combo decays.
   if (game.combo > 0) {
     game.comboTimer -= dt;
-    if (game.comboTimer <= 0) { game.combo = 0; hud.setScore(game.score, 0); }
+    hud.setComboTimer(Math.max(0, game.comboTimer / 4));
+    if (game.comboTimer <= 0) { game.combo = 0; hud.setScore(game.score, 0); hud.setComboTimer(0); }
   }
 
   ship.update(dt, game.time, input, nowMs);
   if (input.firing()) bullets.firePlayer(ship.tryFire());
 
-  // Spawn from the wave queue.
+  // Spawn from the wave queue. Surge waves pour in faster.
+  // Round 3: a brisker pace overall — the old one left the field empty.
   if (game.spawnQueue.length > 0) {
     game.spawnTimer -= dt;
     if (game.spawnTimer <= 0) {
       const kind = game.spawnQueue.shift();
       const x = (Math.random() * 2 - 1) * (PLAY.x - 1.5);
       enemies.spawn(kind, x, -28);
-      game.spawnTimer = Math.max(0.35, 1.15 - game.wave * 0.06);
+      const surge = SURGE_WAVES.has(game.wave);
+      game.spawnTimer = Math.max(0.35, (surge ? 0.55 : 0.9) - game.wave * 0.05);
     }
   }
 
   enemies.update(dt, game.time, ship.x, onEnemyShoot);
   bullets.update(dt);
   powerups.update(dt, game.time, ship.x, ship.z, (kind) => {
+    if (kind === 'nova') { novaBlast(); return; }
     ship.grantPower(kind, nowMs);
     sounds.powerup();
     hud.setPower(kind, true);
@@ -316,4 +358,23 @@ window.__NEONVOID__ = {
   victory: () => { if (game.state === 'playing') endGame(true); },
   spawnBoss: () => { if (game.state === 'playing') { enemies.spawnBoss(); } },
   hurt: () => ship.takeHit(performance.now()),
+  /** Jump straight to a wave (test hook only; used to stage screenshots). */
+  skipWave: (n) => {
+    if (game.state !== 'playing') return;
+    enemies.clear();
+    bullets.clear();
+    powerups.clear();
+    game.spawnQueue = [];
+    startWave(Math.max(1, Math.min(TOTAL_WAVES, n | 0)));
+  },
+  /** Drop extra hostiles on screen at once (test hook only; stages a busy
+   * frame for screenshots — the same shot the game reaches on its own a few
+   * seconds later, when the wave queue has poured in). */
+  stage: (kind, count) => {
+    if (game.state !== 'playing') return;
+    for (let i = 0; i < (count | 0); i++) {
+      enemies.spawn(kind || 'drone', (Math.random() * 2 - 1) * (PLAY.x - 2), -14 - Math.random() * 14);
+    }
+  },
+  nova: () => { if (game.state === 'playing') novaBlast(); },
 };

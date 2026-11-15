@@ -81,6 +81,17 @@ export class SoundBank {
     this._tone(659, 659, 0.2, 'triangle', 0.24, 0.2);
   }
   waveStart() { this._tone(196, 392, 0.25, 'triangle', 0.18); }
+  /** The nova detonation: a deep boom under a rising shimmer. */
+  nova() {
+    this._noise(0.8, 0.55, 700);
+    this._tone(90, 28, 0.7, 'sine', 0.5);
+    this._tone(1047, 2093, 0.4, 'sine', 0.14, 0.05);
+  }
+  /** A surge wave's horn: two low brass-ish calls. */
+  surge() {
+    this._tone(147, 147, 0.22, 'sawtooth', 0.16);
+    this._tone(196, 196, 0.3, 'sawtooth', 0.16, 0.2);
+  }
   gameOver() {
     this._tone(392, 392, 0.22, 'sawtooth', 0.2);
     this._tone(311, 311, 0.22, 'sawtooth', 0.2, 0.2);

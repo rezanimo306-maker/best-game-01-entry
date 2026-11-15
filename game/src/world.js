@@ -38,9 +38,9 @@ export class World {
     this.camera.lookAt(this.cameraLook);
     this.shake = 0;
 
-    const ambient = new THREE.AmbientLight(0x334466, 1.4);
+    const ambient = new THREE.AmbientLight(0x445577, 1.9);
     this.scene.add(ambient);
-    const key = new THREE.DirectionalLight(0x88bbff, 1.6);
+    const key = new THREE.DirectionalLight(0x88bbff, 1.8);
     key.position.set(4, 10, 6);
     this.scene.add(key);
     const rim = new THREE.DirectionalLight(0xff2e88, 0.9);
@@ -63,7 +63,7 @@ export class World {
   }
 
   _buildStars() {
-    const count = 900;
+    const count = 1300;
     const pos = new Float32Array(count * 3);
     const col = new Float32Array(count * 3);
     const c = new THREE.Color();
@@ -73,7 +73,7 @@ export class World {
       pos[i * 3 + 2] = -Math.random() * 120 + 10;
       const pick = Math.random();
       c.set(pick < 0.6 ? 0xffffff : pick < 0.85 ? 0x9fd8ff : 0xffc2dd);
-      c.multiplyScalar(0.5 + Math.random() * 0.7);
+      c.multiplyScalar(0.6 + Math.random() * 0.8);
       col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
     }
     const geo = new THREE.BufferGeometry();
@@ -107,12 +107,12 @@ export class World {
     const fine = new THREE.GridHelper(140, 70, 0x22e6ff, 0x123a66);
     fine.position.y = PLAY.floorY;
     fine.material.transparent = true;
-    fine.material.opacity = 0.8;
+    fine.material.opacity = 0.5;
     this.scene.add(fine);
     const coarse = new THREE.GridHelper(140, 14, 0xff2e88, 0x2a0f3d);
     coarse.position.y = PLAY.floorY - 0.02;
     coarse.material.transparent = true;
-    coarse.material.opacity = 0.55;
+    coarse.material.opacity = 0.35;
     this.scene.add(coarse);
     this.grid = fine;
   }
@@ -165,6 +165,16 @@ export class World {
   }
 
   addShake(amount) { this.shake = Math.min(0.9, this.shake + amount); }
+
+  /** Project a play-plane point to screen pixels (for HUD popups). */
+  toScreen(x, z) {
+    const v = new THREE.Vector3(x, 0, z).project(this.camera);
+    return {
+      x: (v.x * 0.5 + 0.5) * window.innerWidth,
+      y: (-v.y * 0.5 + 0.5) * window.innerHeight,
+      behind: v.z > 1,
+    };
+  }
 
   render() { this.renderer.render(this.scene, this.camera); }
 }

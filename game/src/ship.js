@@ -145,6 +145,7 @@ export class Ship {
     const interval = performance.now() < this.rapidUntil ? FIRE_INTERVAL * 0.55 : FIRE_INTERVAL;
     this.fireCooldown = interval;
     this.sounds.shoot();
+    this.particles.muzzle(this.x, 0, this.z - 1.4);
     const shots = [{ x: this.x, z: this.z - 1.4, dx: 0 }];
     if (performance.now() < this.spreadUntil) {
       shots.push({ x: this.x - 0.4, z: this.z - 1.2, dx: -0.18 });

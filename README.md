@@ -18,6 +18,11 @@ Destroy drones to build your combo multiplier, grab power-ups (shield,
 rapid fire, spread shot), and survive all 10 waves. Lose all 3 hulls and
 the run ends.
 
+Round 3 adds: dart divers that steer at your ship (wave 3+), surge waves
+that pour in faster (waves 3, 6, 9), a rare Nova core that detonates every
+enemy on screen, a boss that enrages under half health, score popups, a
+combo timer, muzzle flashes, shockwave rings and a hit flash.
+
 ## Layout
 
 - `game/index.html` — the page, HUD and menus

@@ -3,9 +3,12 @@
 import * as THREE from 'three';
 
 const KINDS = {
-  shield: { color: 0x22e6ff, label: 'S' },
-  rapid: { color: 0xffc233, label: 'R' },
-  spread: { color: 0x8b5cff, label: 'W' },
+  shield: { color: 0x22e6ff, label: 'S', weight: 3 },
+  rapid: { color: 0xffc233, label: 'R', weight: 3 },
+  spread: { color: 0x8b5cff, label: 'W', weight: 3 },
+  // NOVA (round 3): a rare white core. On pickup it detonates every enemy
+  // on screen — the one drop that turns a bad wave around.
+  nova: { color: 0xffffff, label: 'N', weight: 1 },
 };
 
 export class Powerups {
@@ -20,10 +23,14 @@ export class Powerups {
   }
 
   drop(x, z) {
-    // 12% drop chance, kind picked at random.
+    // 12% drop chance, kind picked by weight (nova is rare: 1 in 10 drops).
     if (Math.random() > 0.12) return;
     const kinds = Object.keys(KINDS);
-    const kind = kinds[Math.floor(Math.random() * kinds.length)];
+    let total = 0;
+    for (const k of kinds) total += KINDS[k].weight;
+    let roll = Math.random() * total;
+    let kind = kinds[0];
+    for (const k of kinds) { roll -= KINDS[k].weight; if (roll <= 0) { kind = k; break; } }
     const mesh = new THREE.Mesh(this.geo, this.mats[kind]);
     mesh.position.set(x, 0, z);
     this.scene.add(mesh);

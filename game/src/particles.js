@@ -28,6 +28,36 @@ export class Particles {
     this.scene.add(this.points);
     // Hide everything initially.
     for (let i = 0; i < MAX; i++) this.pos[i * 3 + 1] = -999;
+
+    // Shockwave rings (nova, boss death): a small pool of flat rings that
+    // expand and fade. Kept separate from the point sparks.
+    this.rings = [];
+    for (let i = 0; i < 6; i++) {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.85, 1, 48),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }),
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.visible = false;
+      this.scene.add(ring);
+      this.rings.push({ mesh: ring, life: 0, maxLife: 1 });
+    }
+  }
+
+  /** An expanding shockwave ring on the play plane. color as [r, g, b] 0..1. */
+  ring(x, y, z, color, size = 16, life = 0.6) {
+    let r = this.rings.find((r) => r.life <= 0) || this.rings[0];
+    r.life = life; r.maxLife = life;
+    r.mesh.visible = true;
+    r.mesh.position.set(x, y + 0.1, z);
+    r.mesh.scale.setScalar(0.5);
+    r.mesh.material.color.setRGB(color[0], color[1], color[2]);
+    r.mesh.userData.size = size;
+  }
+
+  /** A short bright muzzle flash at the ship's nose. */
+  muzzle(x, y, z) {
+    this.burst(x, y, z, [0.65, 0.95, 1], 4, 5, 0.18);
   }
 
   _spawn(x, y, z, vx, vy, vz, life, r, g, b) {
@@ -60,6 +90,14 @@ export class Particles {
   }
 
   update(dt) {
+    for (const r of this.rings) {
+      if (r.life <= 0) continue;
+      r.life -= dt;
+      if (r.life <= 0) { r.mesh.visible = false; r.mesh.material.opacity = 0; continue; }
+      const f = 1 - r.life / r.maxLife;
+      r.mesh.scale.setScalar(0.5 + f * r.mesh.userData.size);
+      r.mesh.material.opacity = 0.9 * (1 - f);
+    }
     for (let i = 0; i < MAX; i++) {
       if (this.life[i] <= 0) continue;
       this.life[i] -= dt;
