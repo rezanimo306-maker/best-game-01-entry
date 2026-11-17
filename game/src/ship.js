@@ -1,10 +1,11 @@
-// ship.js — the player interceptor: mesh, movement, firing, shield, lives.
+// ship.js — the player interceptor: mesh, movement, firing, shield, lives,
+// and the upgrade stats the draft system grows between waves.
 // One clear job: everything the player's ship is and does.
 import * as THREE from 'three';
 import { PLAY } from './world.js';
 
-const SPEED = 15;
-const FIRE_INTERVAL = 0.16;
+const BASE_SPEED = 15;
+const BASE_FIRE_INTERVAL = 0.16;
 
 export class Ship {
   constructor(scene, particles, sounds) {
@@ -29,13 +30,23 @@ export class Ship {
     this.vx = 0;
     this.vz = 0;
     this.lives = 3;
+    this.maxLives = 3;
     this.shield = false;
+    this.shieldCharges = 0;
     this.invulnerableUntil = 0;
     this.fireCooldown = 0;
     this.rapidUntil = 0;
     this.spreadUntil = 0;
     this.alive = true;
     this.trailAcc = 0;
+    // Upgrade stats (grown by the draft in upgrades.js).
+    this.damage = 1;
+    this.fireRateMul = 1;
+    this.extraShots = 0;
+    this.speedMul = 1;
+    this.magnetRadius = 7;
+    this.comboSeconds = 4;
+    this.novaLuck = 0;
   }
 
   _buildMesh() {
@@ -87,7 +98,8 @@ export class Ship {
 
   reset() {
     this.x = 0; this.z = 2; this.vx = 0; this.vz = 0;
-    this.lives = 3; this.shield = false;
+    this.lives = 3; this.maxLives = 3; this.shield = false;
+    this.shieldCharges = 0;
     this.invulnerableUntil = 0;
     this.fireCooldown = 0;
     this.rapidUntil = 0;
@@ -96,14 +108,36 @@ export class Ship {
     this.group.visible = true;
     this.group.position.set(0, 0, 2);
     this.shieldRing.visible = false;
+    this.damage = 1;
+    this.fireRateMul = 1;
+    this.extraShots = 0;
+    this.speedMul = 1;
+    this.magnetRadius = 7;
+    this.comboSeconds = 4;
+    this.novaLuck = 0;
+  }
+
+  /** Apply one drafted upgrade. Called by upgrades.js, one line per effect. */
+  applyUpgrade(id) {
+    if (id === 'heavy') this.damage += 1;
+    else if (id === 'rapid') this.fireRateMul *= 0.8;
+    else if (id === 'twin') this.extraShots += 1;
+    else if (id === 'hull') { this.maxLives += 1; this.lives = Math.min(this.maxLives, this.lives + 1); }
+    else if (id === 'repair') this.lives = Math.min(this.maxLives, this.lives + 1);
+    else if (id === 'magnet') this.magnetRadius += 5;
+    else if (id === 'nova') this.novaLuck += 1;
+    else if (id === 'overdrive') this.comboSeconds += 2;
+    else if (id === 'plating') { this.shield = true; this.shieldCharges = Math.max(this.shieldCharges, 2); }
+    else if (id === 'thrusters') this.speedMul *= 1.15;
   }
 
   /** dt seconds, t total seconds, input from Input, nowMs for timers. */
   update(dt, t, input, nowMs) {
     if (!this.alive) return;
     const steer = input.steer();
-    let tx = this.x + steer.x * SPEED * dt;
-    let tz = this.z + steer.y * SPEED * dt;
+    const speed = BASE_SPEED * this.speedMul;
+    let tx = this.x + steer.x * speed * dt;
+    let tz = this.z + steer.y * speed * dt;
     // Mouse steers the ship toward the pointer's projected position.
     if (input.mouseActive && steer.x === 0 && steer.y === 0) {
       tx = this.x + (input.mouseX * PLAY.x - this.x) * Math.min(1, dt * 6);
@@ -142,14 +176,22 @@ export class Ship {
   /** Returns bullet spawn points when a shot is due, else []. */
   tryFire() {
     if (!this.alive || this.fireCooldown > 0) return [];
-    const interval = performance.now() < this.rapidUntil ? FIRE_INTERVAL * 0.55 : FIRE_INTERVAL;
+    let interval = BASE_FIRE_INTERVAL * this.fireRateMul;
+    if (performance.now() < this.rapidUntil) interval *= 0.55;
     this.fireCooldown = interval;
     this.sounds.shoot();
     this.particles.muzzle(this.x, 0, this.z - 1.4);
-    const shots = [{ x: this.x, z: this.z - 1.4, dx: 0 }];
-    if (performance.now() < this.spreadUntil) {
-      shots.push({ x: this.x - 0.4, z: this.z - 1.2, dx: -0.18 });
-      shots.push({ x: this.x + 0.4, z: this.z - 1.2, dx: 0.18 });
+    const shots = [{ x: this.x, z: this.z - 1.4, dx: 0, dmg: this.damage }];
+    // Twin cannons add a side shot per stack; spread adds angled shots.
+    const spread = performance.now() < this.spreadUntil;
+    const side = this.extraShots + (spread ? 1 : 0);
+    if (side >= 1) {
+      shots.push({ x: this.x - 0.45, z: this.z - 1.2, dx: -0.18, dmg: this.damage });
+      shots.push({ x: this.x + 0.45, z: this.z - 1.2, dx: 0.18, dmg: this.damage });
+    }
+    if (side >= 2) {
+      shots.push({ x: this.x - 0.8, z: this.z - 1.0, dx: -0.34, dmg: this.damage });
+      shots.push({ x: this.x + 0.8, z: this.z - 1.0, dx: 0.34, dmg: this.damage });
     }
     return shots;
   }
@@ -158,7 +200,8 @@ export class Ship {
   takeHit(nowMs) {
     if (!this.alive || nowMs < this.invulnerableUntil) return 'none';
     if (this.shield) {
-      this.shield = false;
+      this.shieldCharges -= 1;
+      if (this.shieldCharges <= 0) this.shield = false;
       this.invulnerableUntil = nowMs + 1200;
       this.sounds.hit();
       return 'shield';
@@ -175,7 +218,7 @@ export class Ship {
   }
 
   grantPower(kind, nowMs) {
-    if (kind === 'shield') this.shield = true;
+    if (kind === 'shield') { this.shield = true; this.shieldCharges = Math.max(this.shieldCharges, 1); }
     else if (kind === 'rapid') this.rapidUntil = nowMs + 8000;
     else if (kind === 'spread') this.spreadUntil = nowMs + 8000;
   }

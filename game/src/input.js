@@ -1,4 +1,5 @@
-// input.js — keyboard + mouse input, one clear job: what the player is pressing.
+// input.js — keyboard + mouse input: what the player is pressing right now.
+// One clear job: gather raw input; the game decides what it means.
 export class Input {
   constructor(canvas) {
     this.keys = new Set();
@@ -8,6 +9,7 @@ export class Input {
     this.mouseActive = false;
     this._pressHandlers = [];
     this._anyHandlers = [];
+    this._downHandlers = [];
     window.addEventListener('keydown', (e) => {
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
       if (!e.repeat) {
@@ -24,17 +26,21 @@ export class Input {
       this.mouseActive = true;
     });
     window.addEventListener('mousedown', (e) => {
-      if (e.button === 0) {
-        this.mouseDown = true;
-        for (const fn of this._anyHandlers) fn('MouseDown');
-      }
+      if (e.button !== 0) return;
+      this.mouseDown = true;
+      for (const fn of this._downHandlers) fn(e.clientX, e.clientY);
+      for (const fn of this._anyHandlers) fn('MouseDown');
     });
     window.addEventListener('mouseup', (e) => { if (e.button === 0) this.mouseDown = false; });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
+  /** Fired once per non-repeat key press. */
   onPress(fn) { this._pressHandlers.push(fn); }
+  /** Fired on every key event and on mouse down. */
   onAny(fn) { this._anyHandlers.push(fn); }
+  /** Fired on mouse down with client coordinates. */
+  onMouseDown(fn) { this._downHandlers.push(fn); }
 
   /** Steering vector from keys, -1..1 on each axis. */
   steer() {
@@ -47,4 +53,13 @@ export class Input {
   }
 
   firing() { return this.mouseDown || this.keys.has('Space'); }
+
+  /** True while one of the draft keys (1/2/3/0) is held. */
+  draftKey() {
+    if (this.keys.has('Digit1')) return 1;
+    if (this.keys.has('Digit2')) return 2;
+    if (this.keys.has('Digit3')) return 3;
+    if (this.keys.has('Digit0')) return 0;
+    return -1;
+  }
 }

@@ -1,5 +1,5 @@
 // audio.js — synthesized WebAudio sounds. No audio files, no network.
-// Everything is built from oscillators and filtered noise, created lazily
+// Every sound is built from oscillators and filtered noise, created lazily
 // on the first user gesture so the browser's autoplay policy is happy.
 export class SoundBank {
   constructor() {
@@ -91,6 +91,34 @@ export class SoundBank {
   surge() {
     this._tone(147, 147, 0.22, 'sawtooth', 0.16);
     this._tone(196, 196, 0.3, 'sawtooth', 0.16, 0.2);
+  }
+  /** The upgrade draft opens: a bright three-note chime. */
+  draft() {
+    this._tone(659, 659, 0.1, 'sine', 0.18);
+    this._tone(880, 880, 0.1, 'sine', 0.18, 0.09);
+    this._tone(1175, 1175, 0.18, 'sine', 0.2, 0.18);
+  }
+  /** An upgrade is picked: a short rising confirmation. */
+  pick() {
+    this._tone(784, 1047, 0.16, 'triangle', 0.22);
+    this._tone(1047, 1319, 0.2, 'triangle', 0.18, 0.08);
+  }
+  /** A kill-streak milestone: a quick fanfare sting. */
+  streak() {
+    this._tone(523, 523, 0.09, 'square', 0.12);
+    this._tone(784, 784, 0.09, 'square', 0.12, 0.07);
+    this._tone(1047, 1047, 0.16, 'square', 0.14, 0.14);
+  }
+  /** The VOIDWARDEN arrives: a low warning growl. */
+  warden() {
+    this._tone(98, 65, 0.5, 'sawtooth', 0.22);
+    this._tone(147, 98, 0.5, 'sawtooth', 0.18, 0.15);
+  }
+  /** The boss enters its final phase: a rising alarm. */
+  finalPhase() {
+    this._tone(220, 440, 0.4, 'sawtooth', 0.2);
+    this._tone(330, 660, 0.4, 'sawtooth', 0.18, 0.12);
+    this._noise(0.4, 0.2, 1200, 0.1);
   }
   gameOver() {
     this._tone(392, 392, 0.22, 'sawtooth', 0.2);

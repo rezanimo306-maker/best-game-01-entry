@@ -1,9 +1,10 @@
-// bullets.js — player and enemy projectiles, pooled meshes, sphere collisions.
+// bullets.js — player and enemy projectiles: pooled meshes, straight flight,
+// and the damage each player bolt carries (grown by the heavy-rounds upgrade).
 // One clear job: everything that flies straight and hurts something.
 import * as THREE from 'three';
 
-const PLAYER_POOL = 48;
-const ENEMY_POOL = 64;
+const PLAYER_POOL = 64;
+const ENEMY_POOL = 96;
 
 export class Bullets {
   constructor(scene) {
@@ -19,7 +20,7 @@ export class Bullets {
       const m = new THREE.Mesh(pGeo, pMat);
       m.visible = false;
       this.scene.add(m);
-      this.player.push({ mesh: m, active: false, x: 0, z: 0, dx: 0, speed: 34 });
+      this.player.push({ mesh: m, active: false, x: 0, z: 0, dx: 0, dmg: 1, speed: 34 });
     }
     for (let i = 0; i < ENEMY_POOL; i++) {
       const m = new THREE.Mesh(eGeo, eMat);
@@ -34,7 +35,7 @@ export class Bullets {
       const b = this.player.find((p) => !p.active);
       if (!b) return;
       b.active = true;
-      b.x = s.x; b.z = s.z; b.dx = s.dx;
+      b.x = s.x; b.z = s.z; b.dx = s.dx; b.dmg = s.dmg || 1;
       b.mesh.visible = true;
       b.mesh.position.set(b.x, 0, b.z);
     }

@@ -1,4 +1,4 @@
-// particles.js — explosion sparks, engine trail, muzzle flash.
+// particles.js — explosion sparks, engine trail, muzzle flash, shockwave rings.
 // One clear job: short-lived visual feedback, pooled so it never allocates mid-game.
 import * as THREE from 'three';
 import { softDot } from './world.js';
@@ -29,8 +29,8 @@ export class Particles {
     // Hide everything initially.
     for (let i = 0; i < MAX; i++) this.pos[i * 3 + 1] = -999;
 
-    // Shockwave rings (nova, boss death): a small pool of flat rings that
-    // expand and fade. Kept separate from the point sparks.
+    // Shockwave rings (nova, boss death, tank kills): a small pool of flat
+    // rings that expand and fade. Kept separate from the point sparks.
     this.rings = [];
     for (let i = 0; i < 6; i++) {
       const ring = new THREE.Mesh(
@@ -46,7 +46,7 @@ export class Particles {
 
   /** An expanding shockwave ring on the play plane. color as [r, g, b] 0..1. */
   ring(x, y, z, color, size = 16, life = 0.6) {
-    let r = this.rings.find((r) => r.life <= 0) || this.rings[0];
+    const r = this.rings.find((r) => r.life <= 0) || this.rings[0];
     r.life = life; r.maxLife = life;
     r.mesh.visible = true;
     r.mesh.position.set(x, y + 0.1, z);
